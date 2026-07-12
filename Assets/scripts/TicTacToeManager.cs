@@ -1,105 +1,142 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 
-public class TicTacToeAutoBind : MonoBehaviour
+public class TicTacToeManager : MonoBehaviour
 {
-    public enum Player { None, X, O }
+    public enum PlayerType { X, O }
 
-    public Button[] cells;   // 9 כפתורים
+    [Header("Prefabs")]
+    public CharacterView playerXPrefab;
+    public CharacterView playerOPrefab;
 
-    public Color xColor = Color.red;
-    public Color oColor = Color.blue;
-    public Color emptyColor = Color.white;
+    [Header("Board Setup")]
+    public BoardCell[] cells; // 9 המשבצות בלוח
 
-    private Player[,] board = new Player[3, 3];
+    private PlayerType currentPlayer = PlayerType.X;
+    private bool isGameActive = true;
 
-    private Queue<Vector2Int> xPieces = new Queue<Vector2Int>();
-    private Queue<Vector2Int> oPieces = new Queue<Vector2Int>();
+    // תורים שמנהלים את הכללים שעל הלוח לכל שחקן (מקסימום 3 כלים לכל שחקן)
+    private Queue<CharacterView> playerXPieces = new Queue<CharacterView>();
+    private Queue<CharacterView> playerOPieces = new Queue<CharacterView>();
 
-    private Player currentPlayer = Player.X;
-    private bool gameOver = false;
+    // מטריצת קומבינציות ניצחון
+    private readonly int[][] winPatterns = new int[][]
+    {
+        new int[] {0, 1, 2}, new int[] {3, 4, 5}, new int[] {6, 7, 8}, // שורות
+        new int[] {0, 3, 6}, new int[] {1, 4, 7}, new int[] {2, 5, 8}, // עמודות
+        new int[] {0, 4, 8}, new int[] {2, 4, 6}                       // אלכסונים
+    };
 
     void Start()
     {
-        for (int i = 0; i < cells.Length; i++)
-        {
-            int index = i;
-            board[i / 3, i % 3] = Player.None;
-
-            SetCellColor(i, emptyColor);
-
-            cells[i].onClick.AddListener(() => OnCellClicked(index));
-        }
-
-        Debug.Log("Game Started - X begins");
+        Debug.Log($"<color=cyan>--- המשחק התחיל! תור שחקן: {currentPlayer} ---</color>");
     }
 
-    void OnCellClicked(int index)
+    public void OnCellClicked(BoardCell clickedCell)
     {
-        if (gameOver) return;
+        if (!isGameActive) return;
 
-        int row = index / 3;
-        int col = index % 3;
-
-        if (board[row, col] != Player.None)
+        if (!clickedCell.IsEmpty())
+        {
+            Debug.Log("<color=yellow>המשבצת הזו כבר תפוסה!</color>");
             return;
+        }
 
-        Queue<Vector2Int> queue =
-            currentPlayer == Player.X ? xPieces : oPieces;
+        StartCoroutine(HandleTurn(clickedCell));
+    }
 
-        // הצבה לוגית
-        board[row, col] = currentPlayer;
-        queue.Enqueue(new Vector2Int(row, col));
+    private IEnumerator HandleTurn(BoardCell cell)
+    {
+        Queue<CharacterView> currentQueue = (currentPlayer == PlayerType.X) ? playerXPieces : playerOPieces;
+        CharacterView prefabToSpawn = (currentPlayer == PlayerType.X) ? playerXPrefab : playerOPrefab;
 
-        // צבע על הכפתור
-        SetCellColor(index, GetColor(currentPlayer));
+        // 1. יצירת הדמות החדשה והצבתה על הלוח (עכשיו יש לשחקן 1, 2, או 3 כלים)
+        CharacterView newCharacter = Instantiate(prefabToSpawn, cell.transform.position, Quaternion.identity);
+        newCharacter.owner = currentPlayer;
+        cell.SetCharacter(newCharacter);
+        currentQueue.Enqueue(newCharacter);
 
-        // בדיקת ניצחון
+        Debug.Log($"שחקן {currentPlayer} שים כלי במשבצת מספר {cell.cellIndex}");
+
+        // הפעלת אנימציית כניסה
+        newCharacter.PlayEnter();
+
+        // 2. בדיקת ניצחון מיידית
         if (CheckWin(currentPlayer))
         {
-            gameOver = true;
-            Debug.Log($"🎉 {currentPlayer} WINS!");
-            return;
+            isGameActive = false;
+            Debug.Log($"<color=green>=== שחקן {currentPlayer} ניצח במשחק! ===</color>");
+            
+            // השהיה קלה לסיום אנימציית הכניסה
+            yield return new WaitForSeconds(0.5f);
+            EndGame(currentPlayer);
+            yield break; // עצירת ה-Coroutine, המשחק הסתיים!
         }
 
-        // אם יש 3 כלים → מוחקים את הישן ביותר
-        if (queue.Count == 3)
+        // 3. אם אין ניצחון והשחקן הרגע הציב את הכלי השלישי שלו - הכלי הראשון נעלם
+        if (currentQueue.Count == 3)
         {
-            Vector2Int old = queue.Dequeue();
+            CharacterView oldestPiece = currentQueue.Dequeue();
+            
+            // מציאת המשבצת שהכלי הישן ישב עליה וריקונה
+            foreach (var c in cells)
+            {
+                if (c.GetCharacter() == oldestPiece)
+                {
+                    c.ClearCell();
+                    break;
+                }
+            }
 
-            board[old.x, old.y] = Player.None;
-
-            int oldIndex = old.x * 3 + old.y;
-            SetCellColor(oldIndex, emptyColor);
+            Debug.Log($"<color=orange>שחקן {currentPlayer} הציב כלי שלישי ללא ניצחון - הכלי הישן שלו נעלם מהלוח!</color>");
+            oldestPiece.PlayExit();
         }
 
-        currentPlayer = currentPlayer == Player.X ? Player.O : Player.X;
-        Debug.Log("Turn: " + currentPlayer);
+        // 4. החלפת תור
+        currentPlayer = (currentPlayer == PlayerType.X) ? PlayerType.O : PlayerType.X;
+        Debug.Log($"<color=cyan>--- תור שחקן: {currentPlayer} ---</color>");
     }
 
-    void SetCellColor(int index, Color color)
+    private bool CheckWin(PlayerType player)
     {
-        Image img = cells[index].GetComponent<Image>();
-        img.color = color;
-    }
-
-    Color GetColor(Player p)
-    {
-        return p == Player.X ? xColor : oColor;
-    }
-
-    bool CheckWin(Player p)
-    {
-        for (int i = 0; i < 3; i++)
+        foreach (var pattern in winPatterns)
         {
-            if (board[i,0]==p && board[i,1]==p && board[i,2]==p) return true;
-            if (board[0,i]==p && board[1,i]==p && board[2,i]==p) return true;
+            bool hasWin = true;
+            foreach (int index in pattern)
+            {
+                CharacterView charInCell = cells[index].GetCharacter();
+                
+                if (charInCell == null || charInCell.owner != player)
+                {
+                    hasWin = false;
+                    break;
+                }
+            }
+
+            if (hasWin) return true;
         }
-
-        if (board[0,0]==p && board[1,1]==p && board[2,2]==p) return true;
-        if (board[0,2]==p && board[1,1]==p && board[2,0]==p) return true;
-
         return false;
+    }
+
+    private void EndGame(PlayerType winner)
+    {
+        foreach (var cell in cells)
+        {
+            CharacterView character = cell.GetCharacter();
+            if (character != null)
+            {
+                if (character.owner == winner)
+                {
+                    // המנצח מפעיל אנימציית Win
+                    character.PlayWin();
+                }
+                else
+                {
+                    // הכלים של השחקן שהפסיד נכנסים למצב Exit ונעלמים
+                    character.PlayExit();
+                }
+            }
+        }
     }
 }
