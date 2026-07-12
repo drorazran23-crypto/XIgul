@@ -11,11 +11,11 @@ public class TicTacToeManager : MonoBehaviour
     public CharacterView playerOPrefab;
 
     [Header("Board Setup")]
-    public BoardCell[] cells; // 9 המשבצות בלוח
+    public BoardCell[] cells; 
 
     [Header("Scene Transition Settings")]
-    public string winSceneName = "EndScene"; // שם סצינת הסיום
-    public float winSceneDelay = 3.0f;       // ה-Offset בשניות עד המעבר לסצינה
+    public string winSceneName = "EndScene"; 
+    public float winSceneDelay = 3.0f;       
 
     private PlayerType currentPlayer = PlayerType.X;
     private bool isGameActive = true;
@@ -32,7 +32,7 @@ public class TicTacToeManager : MonoBehaviour
 
     void Start()
     {
-        Debug.Log($"<color=cyan>--- המשחק התחיל! תור שחקן: {currentPlayer} ---</color>");
+        Debug.Log($"<color=cyan>--- Game Started! Player Turn: {currentPlayer} ---</color>");
     }
 
     public void OnCellClicked(BoardCell clickedCell)
@@ -41,7 +41,7 @@ public class TicTacToeManager : MonoBehaviour
 
         if (!clickedCell.IsEmpty())
         {
-            Debug.Log("<color=yellow>המשבצת הזו כבר תפוסה!</color>");
+            Debug.Log("<color=yellow>Cell is already occupied!</color>");
             return;
         }
 
@@ -53,31 +53,30 @@ public class TicTacToeManager : MonoBehaviour
         Queue<CharacterView> currentQueue = (currentPlayer == PlayerType.X) ? playerXPieces : playerOPieces;
         CharacterView prefabToSpawn = (currentPlayer == PlayerType.X) ? playerXPrefab : playerOPrefab;
 
-        // 1. יצירת הדמות החדשה
+        // 1. Spawn the new character
         CharacterView newCharacter = Instantiate(prefabToSpawn, cell.transform.position, Quaternion.identity);
         newCharacter.owner = currentPlayer;
         cell.SetCharacter(newCharacter);
         currentQueue.Enqueue(newCharacter);
 
-        Debug.Log($"שחקן {currentPlayer} שים כלי במשבצת מספר {cell.cellIndex}");
+        Debug.Log($"Player {currentPlayer} placed a piece in cell {cell.cellIndex}");
         newCharacter.PlayEnter();
 
-        // 2. בדיקת ניצחון מיידית
+        // 2. Immediate Win Check
         if (CheckWin(currentPlayer))
         {
             isGameActive = false;
-            Debug.Log($"<color=green>=== שחקן {currentPlayer} ניצח במשחק! ===</color>");
+            Debug.Log($"<color=green>=== Player {currentPlayer} Won the Game! ===</color>");
             
             yield return new WaitForSeconds(0.5f);
             EndGame(currentPlayer);
 
-            // 3. השהיה לפי ה-Offset שהוגדר, ולאחר מכן מעבר לסצינת הסיום
             yield return new WaitForSeconds(winSceneDelay);
             SceneManager.LoadScene(winSceneName);
             yield break;
         }
 
-        // 4. אם אין ניצחון והשחקן הציב כלי שלישי - העלמת הכלי הישן
+        // 3. If no win and player placed their 3rd piece - Remove oldest piece
         if (currentQueue.Count == 3)
         {
             CharacterView oldestPiece = currentQueue.Dequeue();
@@ -91,13 +90,13 @@ public class TicTacToeManager : MonoBehaviour
                 }
             }
 
-            Debug.Log($"<color=orange>שחקן {currentPlayer} הציב כלי שלישי ללא ניצחון - הכלי הישן שלו נעלם מהלוח!</color>");
+            Debug.Log($"<color=orange>Player {currentPlayer} placed 3rd piece (no win) - Oldest piece removed!</color>");
             oldestPiece.PlayExit();
         }
 
-        // 5. החלפת תור
+        // 4. Switch Turn
         currentPlayer = (currentPlayer == PlayerType.X) ? PlayerType.O : PlayerType.X;
-        Debug.Log($"<color=cyan>--- תור שחקן: {currentPlayer} ---</color>");
+        Debug.Log($"<color=cyan>--- Player Turn: {currentPlayer} ---</color>");
     }
 
     private bool CheckWin(PlayerType player)
@@ -108,20 +107,18 @@ public class TicTacToeManager : MonoBehaviour
             foreach (int index in pattern)
             {
                 CharacterView charInCell = cells[index].GetCharacter();
-                
                 if (charInCell == null || charInCell.owner != player)
                 {
                     hasWin = false;
                     break;
                 }
             }
-
             if (hasWin) return true;
         }
         return false;
     }
 
-    private void EndGame(PlayerType winner)
+   private void EndGame(PlayerType winner)
     {
         foreach (var cell in cells)
         {
@@ -130,10 +127,12 @@ public class TicTacToeManager : MonoBehaviour
             {
                 if (character.owner == winner)
                 {
-                    character.PlayWin();
+                    // שימוש בפונקציה החדשה עם האופסט
+                    character.PlayWinWithOffset();
                 }
                 else
                 {
+                    // הכלים של המפסיד יוצאים מהלוח
                     character.PlayExit();
                 }
             }

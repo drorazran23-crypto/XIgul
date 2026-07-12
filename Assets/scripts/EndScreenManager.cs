@@ -5,19 +5,18 @@ using UnityEngine.SceneManagement;
 
 public class EndScreenManager : MonoBehaviour
 {
-    // השמות של הסצינות שלך כפי שהן מופיעות בפרויקט
     public string mainMenuSceneName = "MainMenu";
     public string gameSceneName = "GameScene";
 
-    // יקרא על ידי כפתור "חזרה להתחלה"
     public void GoToMainMenu()
     {
+        Debug.Log("Returning to Main Menu...");
         SceneManager.LoadScene(mainMenuSceneName);
     }
 
-    // יקרא על ידי כפתור "משחק חדש" (הפעלה מחדש של המשחק)
     public void RestartGame()
     {
+        Debug.Log("Restarting Game...");
         SceneManager.LoadScene(gameSceneName);
     }
 }

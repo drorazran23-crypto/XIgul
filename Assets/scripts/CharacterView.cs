@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -5,8 +6,6 @@ using UnityEngine.UI;
 public class CharacterView : MonoBehaviour
 {
     private Animator animator;
-
-    // הגדרה למי שייכת הדמות הזו
     public TicTacToeManager.PlayerType owner;
 
     void Awake()
@@ -14,40 +13,25 @@ public class CharacterView : MonoBehaviour
         animator = GetComponent<Animator>();
     }
 
-    public void PlayEnter()
+    // הפונקציה החדשה לניצחון "חי" יותר
+    public void PlayWinWithOffset()
     {
-        if (animator != null) animator.Play("Enter");
+        StartCoroutine(WinSequence());
     }
 
-    public void PlayIdle()
+    private IEnumerator WinSequence() 
     {
-        if (animator != null) animator.Play("Idle");
-    }
+    float randomDelay = Random.Range(0f, 0.4f);
+    yield return new WaitForSeconds(randomDelay);
+    if (animator != null) animator.Play("Win");
+    } 
 
-    public void PlayExit()
-    {
-        if (animator != null) animator.Play("Exit");
-    }
-
-    public void PlayWin()
-    {
-        if (animator != null) animator.Play("Win");
-    }
-
-    public void PlayLose()
-    {
-        if (animator != null) animator.Play("Lose");
-    }
-
-    // נקרא בסוף אנימציית Exit
-    public void DestroySelf()
-    {
-        Destroy(gameObject);
-    }
-
-    // נקרא בסוף אנימציית Enter
-    public void GoToIdle()
-    {
-        PlayIdle();
-    }
+    // שאר הפונקציות נשארות אותו דבר...
+    public void PlayEnter() => animator?.Play("Enter");
+    public void PlayIdle() => animator?.Play("Idle");
+    public void PlayExit() => animator?.Play("Exit");
+    public void PlayLose() => animator?.Play("Lose");
+    public void DestroySelf() => Destroy(gameObject);
+    public void ExitFinished() => DestroySelf();
+    public void GoToIdle() => PlayIdle();
 }
