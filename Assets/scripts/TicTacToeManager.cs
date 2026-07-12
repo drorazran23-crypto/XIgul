@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
+using UnityEngine.SceneManagement;
 public class TicTacToeManager : MonoBehaviour
 {
     public enum PlayerType { X, O }
@@ -13,19 +13,21 @@ public class TicTacToeManager : MonoBehaviour
     [Header("Board Setup")]
     public BoardCell[] cells; // 9 המשבצות בלוח
 
+    [Header("Scene Transition Settings")]
+    public string winSceneName = "EndScene"; // שם סצינת הסיום
+    public float winSceneDelay = 3.0f;       // ה-Offset בשניות עד המעבר לסצינה
+
     private PlayerType currentPlayer = PlayerType.X;
     private bool isGameActive = true;
 
-    // תורים שמנהלים את הכללים שעל הלוח לכל שחקן (מקסימום 3 כלים לכל שחקן)
     private Queue<CharacterView> playerXPieces = new Queue<CharacterView>();
     private Queue<CharacterView> playerOPieces = new Queue<CharacterView>();
 
-    // מטריצת קומבינציות ניצחון
     private readonly int[][] winPatterns = new int[][]
     {
-        new int[] {0, 1, 2}, new int[] {3, 4, 5}, new int[] {6, 7, 8}, // שורות
-        new int[] {0, 3, 6}, new int[] {1, 4, 7}, new int[] {2, 5, 8}, // עמודות
-        new int[] {0, 4, 8}, new int[] {2, 4, 6}                       // אלכסונים
+        new int[] {0, 1, 2}, new int[] {3, 4, 5}, new int[] {6, 7, 8},
+        new int[] {0, 3, 6}, new int[] {1, 4, 7}, new int[] {2, 5, 8},
+        new int[] {0, 4, 8}, new int[] {2, 4, 6}
     };
 
     void Start()
@@ -51,15 +53,13 @@ public class TicTacToeManager : MonoBehaviour
         Queue<CharacterView> currentQueue = (currentPlayer == PlayerType.X) ? playerXPieces : playerOPieces;
         CharacterView prefabToSpawn = (currentPlayer == PlayerType.X) ? playerXPrefab : playerOPrefab;
 
-        // 1. יצירת הדמות החדשה והצבתה על הלוח (עכשיו יש לשחקן 1, 2, או 3 כלים)
+        // 1. יצירת הדמות החדשה
         CharacterView newCharacter = Instantiate(prefabToSpawn, cell.transform.position, Quaternion.identity);
         newCharacter.owner = currentPlayer;
         cell.SetCharacter(newCharacter);
         currentQueue.Enqueue(newCharacter);
 
         Debug.Log($"שחקן {currentPlayer} שים כלי במשבצת מספר {cell.cellIndex}");
-
-        // הפעלת אנימציית כניסה
         newCharacter.PlayEnter();
 
         // 2. בדיקת ניצחון מיידית
@@ -68,18 +68,20 @@ public class TicTacToeManager : MonoBehaviour
             isGameActive = false;
             Debug.Log($"<color=green>=== שחקן {currentPlayer} ניצח במשחק! ===</color>");
             
-            // השהיה קלה לסיום אנימציית הכניסה
             yield return new WaitForSeconds(0.5f);
             EndGame(currentPlayer);
-            yield break; // עצירת ה-Coroutine, המשחק הסתיים!
+
+            // 3. השהיה לפי ה-Offset שהוגדר, ולאחר מכן מעבר לסצינת הסיום
+            yield return new WaitForSeconds(winSceneDelay);
+            SceneManager.LoadScene(winSceneName);
+            yield break;
         }
 
-        // 3. אם אין ניצחון והשחקן הרגע הציב את הכלי השלישי שלו - הכלי הראשון נעלם
+        // 4. אם אין ניצחון והשחקן הציב כלי שלישי - העלמת הכלי הישן
         if (currentQueue.Count == 3)
         {
             CharacterView oldestPiece = currentQueue.Dequeue();
             
-            // מציאת המשבצת שהכלי הישן ישב עליה וריקונה
             foreach (var c in cells)
             {
                 if (c.GetCharacter() == oldestPiece)
@@ -93,7 +95,7 @@ public class TicTacToeManager : MonoBehaviour
             oldestPiece.PlayExit();
         }
 
-        // 4. החלפת תור
+        // 5. החלפת תור
         currentPlayer = (currentPlayer == PlayerType.X) ? PlayerType.O : PlayerType.X;
         Debug.Log($"<color=cyan>--- תור שחקן: {currentPlayer} ---</color>");
     }
@@ -128,12 +130,10 @@ public class TicTacToeManager : MonoBehaviour
             {
                 if (character.owner == winner)
                 {
-                    // המנצח מפעיל אנימציית Win
                     character.PlayWin();
                 }
                 else
                 {
-                    // הכלים של השחקן שהפסיד נכנסים למצב Exit ונעלמים
                     character.PlayExit();
                 }
             }

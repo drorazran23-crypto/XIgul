@@ -393,6 +393,8 @@ MonoBehaviour:
   - {fileID: 1908604846}
   - {fileID: 603854808}
   - {fileID: 599909817}
+  winSceneName: EndScene
+  winSceneDelay: 3
 --- !u!224 &352515846
 RectTransform:
   m_ObjectHideFlags: 0
