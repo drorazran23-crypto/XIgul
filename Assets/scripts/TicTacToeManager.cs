@@ -23,6 +23,9 @@ public class TicTacToeManager : MonoBehaviour
     private Queue<CharacterView> playerXPieces = new Queue<CharacterView>();
     private Queue<CharacterView> playerOPieces = new Queue<CharacterView>();
 
+    private bool nextXFlipped = false;
+    private bool nextOFlipped = false;
+
     private readonly int[][] winPatterns = new int[][]
     {
         new int[] {0, 1, 2}, new int[] {3, 4, 5}, new int[] {6, 7, 8},
@@ -49,56 +52,68 @@ public class TicTacToeManager : MonoBehaviour
     }
 
     private IEnumerator HandleTurn(BoardCell cell)
+{
+    // 1. הגדרת התור והפריפאב הנכון לפי השחקן הנוכחי
+    Queue<CharacterView> currentQueue = (currentPlayer == PlayerType.X) ? playerXPieces : playerOPieces;
+    CharacterView prefabToSpawn = (currentPlayer == PlayerType.X) ? playerXPrefab : playerOPrefab;
+
+    // 2. יצירת הדמות החדשה במשבצת שנלחצה
+    CharacterView newCharacter = Instantiate(prefabToSpawn, cell.transform.position, Quaternion.identity);
+    newCharacter.owner = currentPlayer;
+    cell.SetCharacter(newCharacter);
+    currentQueue.Enqueue(newCharacter);
+
+    // 3. לוגיקת הפליפ (Flipping Logic) - אחת רגילה, אחת הפוכה
+    bool shouldFlip = (currentPlayer == PlayerType.X) ? nextXFlipped : nextOFlipped;
+    if (shouldFlip)
     {
-        Queue<CharacterView> currentQueue = (currentPlayer == PlayerType.X) ? playerXPieces : playerOPieces;
-        CharacterView prefabToSpawn = (currentPlayer == PlayerType.X) ? playerXPrefab : playerOPrefab;
+        newCharacter.transform.localScale = new Vector3(-1, 1, 1);
+    }
+    
+    // עדכון המצב לפעם הבאה של השחקן (מ-True ל-False ולהיפך)
+    if (currentPlayer == PlayerType.X) nextXFlipped = !nextXFlipped;
+    else nextOFlipped = !nextOFlipped;
 
-        // 1. Spawn the new character
-        CharacterView newCharacter = Instantiate(prefabToSpawn, cell.transform.position, Quaternion.identity);
-        newCharacter.owner = currentPlayer;
-        cell.SetCharacter(newCharacter);
-        currentQueue.Enqueue(newCharacter);
+    Debug.Log($"Player {currentPlayer} placed a piece. Flipped: {shouldFlip}");
+    newCharacter.PlayEnter();
 
-        Debug.Log($"Player {currentPlayer} placed a piece in cell {cell.cellIndex}");
-        newCharacter.PlayEnter();
+    // 4. בדיקת ניצחון מיידית (לפני שמשהו נעלם)
+    if (CheckWin(currentPlayer))
+    {
+        isGameActive = false;
+        Debug.Log($"<color=green>=== Player {currentPlayer} Won! ===</color>");
+        
+        yield return new WaitForSeconds(0.5f); // המתנה קלה לסיום אנימציית הכניסה
+        EndGame(currentPlayer);
 
-        // 2. Immediate Win Check
-        if (CheckWin(currentPlayer))
-        {
-            isGameActive = false;
-            Debug.Log($"<color=green>=== Player {currentPlayer} Won the Game! ===</color>");
-            
-            yield return new WaitForSeconds(0.5f);
-            EndGame(currentPlayer);
-
-            yield return new WaitForSeconds(winSceneDelay);
-            SceneManager.LoadScene(winSceneName);
-            yield break;
-        }
-
-        // 3. If no win and player placed their 3rd piece - Remove oldest piece
-        if (currentQueue.Count == 3)
-        {
-            CharacterView oldestPiece = currentQueue.Dequeue();
-            
-            foreach (var c in cells)
-            {
-                if (c.GetCharacter() == oldestPiece)
-                {
-                    c.ClearCell();
-                    break;
-                }
-            }
-
-            Debug.Log($"<color=orange>Player {currentPlayer} placed 3rd piece (no win) - Oldest piece removed!</color>");
-            oldestPiece.PlayExit();
-        }
-
-        // 4. Switch Turn
-        currentPlayer = (currentPlayer == PlayerType.X) ? PlayerType.O : PlayerType.X;
-        Debug.Log($"<color=cyan>--- Player Turn: {currentPlayer} ---</color>");
+        yield return new WaitForSeconds(winSceneDelay); // המתנה לפני מעבר סצנה
+        SceneManager.LoadScene(winSceneName);
+        yield break; // עוצרים כאן - המשחק נגמר
     }
 
+    // 5. אם אין ניצחון והשחקן הציב את הכלי השלישי שלו - הכלי הישן ביותר נעלם
+    if (currentQueue.Count == 3)
+    {
+        CharacterView oldestPiece = currentQueue.Dequeue();
+        
+        // מציאת המשבצת שהכלי הישן ישב עליה וריקונה כדי שנוכל ללחוץ עליה שוב
+        foreach (var c in cells)
+        {
+            if (c.GetCharacter() == oldestPiece)
+            {
+                c.ClearCell();
+                break;
+            }
+        }
+
+        Debug.Log($"<color=orange>Player {currentPlayer} placed 3rd piece without winning. Removing oldest piece.</color>");
+        oldestPiece.PlayExit(); // הכלי עושה אנימציית יציאה ומשמיד את עצמו
+    }
+
+    // 6. החלפת תור לשחקן הבא
+    currentPlayer = (currentPlayer == PlayerType.X) ? PlayerType.O : PlayerType.X;
+    Debug.Log($"<color=cyan>--- Current Turn: {currentPlayer} ---</color>");
+}
     private bool CheckWin(PlayerType player)
     {
         foreach (var pattern in winPatterns)
