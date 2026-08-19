@@ -114,6 +114,8 @@ public class TicTacToeManager : MonoBehaviour
     currentPlayer = (currentPlayer == PlayerType.X) ? PlayerType.O : PlayerType.X;
     Debug.Log($"<color=cyan>--- Current Turn: {currentPlayer} ---</color>");
 }
+
+
     private bool CheckWin(PlayerType player)
     {
         foreach (var pattern in winPatterns)
